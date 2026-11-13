@@ -41,7 +41,35 @@ agent:  firefox_navigate → firefox_snapshot → firefox_click → firefox_fill
 
 ## Install
 
-Add the plugin to your OpenCode configuration:
+### With the OpenCode CLI
+
+```sh
+opencode plugin add opencode-firefox
+```
+
+This installs the package and adds it to your global
+`~/.config/opencode/opencode.jsonc`. Pin a release with
+`opencode plugin add opencode-firefox@0.1.1`.
+
+Manage it with:
+
+```sh
+opencode plugin list                   # installed plugins
+opencode plugin check                  # check for updates
+opencode plugin update                 # update package plugins
+opencode plugin remove opencode-firefox
+```
+
+`plugin add` only writes global configuration. For a project-local install,
+edit the project's `opencode.jsonc` instead (next section).
+
+If you previously copied `firefox-bidi.ts` into `~/.config/opencode/plugins/`,
+remove it after installing the package, otherwise both register the same
+`firefox.*` tools.
+
+### With configuration
+
+Add the plugin to `opencode.jsonc` — global or project:
 
 ```jsonc
 {
@@ -50,7 +78,10 @@ Add the plugin to your OpenCode configuration:
 }
 ```
 
-OpenCode installs the package automatically. To use a local checkout instead:
+OpenCode installs the package automatically. To pass plugin options, use the
+object form described in [Configuration](#configuration).
+
+To use a local checkout during development:
 
 ```jsonc
 {
