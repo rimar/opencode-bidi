@@ -226,8 +226,8 @@ JavaScript evaluated in the page, which is why there is nothing else to install.
 ## Development
 
 ```sh
-npm install
-npm run check   # typecheck + tests
+pnpm install
+pnpm check   # typecheck + tests
 ```
 
 To try a local checkout in OpenCode, point `plugins` at the repository

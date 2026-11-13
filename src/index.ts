@@ -20,7 +20,7 @@
  * With no profile option the plugin launches an isolated, managed profile.
  */
 
-import { Plugin } from "@opencode/plugin";
+import type { Plugin } from "@opencode/plugin";
 import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -801,7 +801,7 @@ async function listTabs(): Promise<Array<{ index: number; id: string; url: strin
 /* plugin                                                              */
 /* ------------------------------------------------------------------ */
 
-export default Plugin.define({
+const plugin: Plugin.Plugin = {
   id: "firefox-bidi",
   async setup(ctx) {
     settings = resolveSettings(process.env, ctx.options);
@@ -1116,4 +1116,6 @@ export default Plugin.define({
       }
     };
   },
-});
+};
+
+export default plugin;

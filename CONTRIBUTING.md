@@ -5,8 +5,8 @@ Thanks for taking a look. Bug reports and pull requests are welcome.
 ## Before opening a PR
 
 ```sh
-npm install
-npm run check   # typecheck + tests
+pnpm install
+pnpm check   # typecheck + tests
 ```
 
 - Keep the plugin dependency-free at runtime. If a change needs a library,

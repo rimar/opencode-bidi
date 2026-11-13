@@ -1,10 +1,11 @@
 {
   "name": "opencode-firefox",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "OpenCode plugin that drives Firefox over WebDriver BiDi — attach to your real session or launch an isolated profile. No extension, no browser tooling.",
   "type": "module",
   "license": "MIT",
   "author": "Yuval Rimar",
+  "packageManager": "pnpm@10.11.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rimar/opencode-firefox.git"
@@ -31,12 +32,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
-    "check": "npm run typecheck && npm test"
-  },
-  "dependencies": {
-    "@opencode/plugin": "^2.3.0"
+    "check": "pnpm typecheck && pnpm test"
   },
   "devDependencies": {
+    "@opencode/plugin": "^2.3.0",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2"
   }
