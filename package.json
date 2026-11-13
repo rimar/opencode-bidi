@@ -1,0 +1,43 @@
+{
+  "name": "opencode-firefox",
+  "version": "0.1.0",
+  "description": "OpenCode plugin that drives your real Firefox over WebDriver BiDi — existing logins, no extension, no browser tooling.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Yuval Rimar",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rimar/opencode-firefox.git"
+  },
+  "homepage": "https://github.com/rimar/opencode-firefox#readme",
+  "bugs": {
+    "url": "https://github.com/rimar/opencode-firefox/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "firefox",
+    "webdriver-bidi",
+    "bidi",
+    "browser-automation",
+    "ai-agent"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@opencode/plugin": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
