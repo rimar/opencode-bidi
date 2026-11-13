@@ -4,12 +4,13 @@
 [![CI](https://github.com/rimar/opencode-firefox/actions/workflows/ci.yml/badge.svg)](https://github.com/rimar/opencode-firefox/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Give your OpenCode agent the Firefox you already use.
+Give your OpenCode agent a real Firefox to drive.
 
-`opencode-firefox` is an [OpenCode](https://opencode.ai) plugin that drives a
-real, running Firefox over **WebDriver BiDi**. No extension, no Playwright, no
-Selenium, no separate browser profile — just the browser with your cookies and
-logins in it.
+`opencode-firefox` is an [OpenCode](https://opencode.ai) plugin that talks to
+Firefox over **WebDriver BiDi**. If Firefox is already running with remote
+debugging, it attaches to it and uses that session — cookies, logins, open tabs.
+If not, it launches its own copy with a separate profile, so it never touches
+your normal browser by accident. No extension, no Playwright, no Selenium.
 
 ```text
 you:    book the cheapest direct flight on Friday
@@ -19,8 +20,9 @@ agent:  firefox_navigate → firefox_snapshot → firefox_click → firefox_fill
 
 ## Why
 
-- **Your session, not a sandbox.** It attaches to the Firefox you are already
-  using, so sites you are signed in to stay signed in.
+- **Your session when you want it.** Attach to the Firefox you are already
+  using, and sites you are signed in to stay signed in. When the plugin has to
+  launch a browser, it uses a separate profile instead of hijacking yours.
 - **Zero browser tooling.** One WebSocket to Firefox's BiDi endpoint and plain
   JavaScript in the page. No driver to install, no extension to keep updated,
   no Playwright version to match.
@@ -56,24 +58,94 @@ OpenCode installs the package automatically. To use a local checkout instead:
 }
 ```
 
-Then start Firefox with the debugging port open:
+Then pick how Firefox starts:
 
-```sh
-firefox --remote-debugging-port 9222
-```
+- **Let the agent launch it** — run `firefox_start`. It uses an isolated profile
+  (`~/.local/share/opencode-firefox/profile` on Linux) that can run next to your
+  normal Firefox. Nothing is shared with your personal session.
+- **Attach to your real session** — start Firefox yourself with the port open:
 
-You can also ask the agent to run `firefox_start` and it will launch Firefox for
-you. If Firefox is **already running without the flag**, a new launch forwards
-to the existing instance and the port never opens — quit Firefox first, or use
-`firefox_restart`.
+  ```sh
+  firefox --remote-debugging-port 9222
+  ```
+
+  The plugin attaches to whatever Firefox owns that port, with whatever profile
+  it was started with. If Firefox is already open without the flag, the new
+  process can forward to the existing instance and the port never opens — quit
+  Firefox first, or start a separate profile.
+
+See [Profiles](#profiles-which-firefox-the-agent-gets) for the full rules.
 
 ## Configuration
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `FIREFOX_BIDI_PORT` | `9222` | Debugging port |
-| `FIREFOX_BIN` | auto-detected | Firefox executable (set it if your install is elsewhere) |
-| `FIREFOX_PROFILE` | Firefox default | Optional `-profile` directory for the launched instance |
+Configure the plugin through the object form in `opencode.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "opencode-firefox",
+      "options": {
+        "port": 9222,
+        "binary": "/usr/lib/firefox/firefox",
+        "profile": "/home/me/.mozilla/firefox/abc.agent",
+        "defaultProfile": false
+      }
+    }
+  ]
+}
+```
+
+| Option | Environment fallback | Default | Meaning |
+|---|---|---|---|
+| `port` | `FIREFOX_BIDI_PORT` | `9222` | Debugging port the plugin connects to |
+| `binary` | `FIREFOX_BIN` | auto-detected | Firefox executable |
+| `profile` | `FIREFOX_PROFILE` | isolated profile | `-profile` directory used when the plugin launches Firefox |
+| `defaultProfile` | `FIREFOX_DEFAULT_PROFILE` | `false` | Launch with your normal Firefox profile instead of an isolated one |
+
+Options win when both are set; the environment variables are there for CI and
+shell wrappers. Settings are read when the plugin loads, so save the config to
+reload it (or run `/reload`).
+
+### Profiles: which Firefox the agent gets
+
+Attaching is not affected by these settings. If Firefox already has the
+debugging port open, the plugin uses that instance with whatever profile it was
+started with.
+
+When the plugin **launches** Firefox (`firefox_start`, `firefox_restart`) it
+picks a profile in this order:
+
+1. **`profile: "/path/to/dir"`** — that profile. Create one with
+   `firefox -P` → **Create Profile…**, then read its **Root Directory** from
+   `about:profiles`. The directory is created if it does not exist.
+2. **`defaultProfile: true`** — no `-profile` flag, so Firefox uses your
+   normal default profile: every cookie, logged-in account, history entry, and
+   extension you browse with. The agent can act as you anywhere you are signed
+   in. It also hits Firefox's single-instance rule (if your normal Firefox is
+   already open, the launch forwards to it and the port never opens), and
+   `firefox_restart` may have to kill every Firefox process because it cannot
+   tell its own instance apart.
+3. **Neither (the default)** — an isolated, plugin-managed profile:
+
+   | Platform | Location |
+   |---|---|
+   | Linux | `$XDG_DATA_HOME/opencode-firefox/profile` (default `~/.local/share/...`) |
+   | Linux (snap Firefox) | `~/snap/firefox/common/opencode-firefox/profile` |
+   | macOS | `~/Library/Application Support/opencode-firefox/profile` |
+   | Windows | `%LOCALAPPDATA%\opencode-firefox\profile` |
+
+   It starts with no cookies or logins and runs alongside your normal Firefox.
+   It persists between launches, so sites you sign in to there stay signed in.
+   This is a separate identity, **not** a sandbox: the agent controls everything
+   inside it.
+
+If you start Firefox yourself, pass the profile on that command line instead:
+
+```sh
+firefox -profile /path/to/profile --remote-debugging-port 9222
+```
 
 ## Tools
 
@@ -83,8 +155,8 @@ as `tools.firefox.*`.
 | Tool | Purpose |
 |---|---|
 | `firefox_status` | Port/session/tab health check; attaches if needed |
-| `firefox_start` | Launch Firefox with debugging if it is not running |
-| `firefox_restart` | Kill and relaunch Firefox, reopening the current page |
+| `firefox_start` | Launch Firefox with debugging if it is not running (isolated profile by default) |
+| `firefox_restart` | Stop and relaunch the Firefox it launched, reopening the current page |
 | `firefox_navigate` | Open a URL, optionally in a new tab |
 | `firefox_snapshot` | URL, title, numbered interactive elements (`e0`, `e1`, …), visible text |
 | `firefox_click` | Click by ref, CSS selector, or visible text / aria-label |
@@ -107,17 +179,21 @@ state from the last snapshot.
 
 ## Security
 
-This plugin deliberately gives the agent the same reach as your browsing
-session: cookies, logged-in accounts, and any site you can open. A malicious or
-compromised page can try to prompt-inject the agent into acting on your behalf.
+Attaching gives the agent the same reach as your browsing session: cookies,
+logged-in accounts, and any site you can open. A malicious or compromised page
+can try to prompt-inject the agent into acting on your behalf.
 
+- The default launch mode is an isolated profile with no logins. You only expose
+  your real session when you attach to your running Firefox, or when you opt in
+  with `defaultProfile: true` (or `FIREFOX_DEFAULT_PROFILE=1`).
 - Prefer sites you trust, and review actions on sensitive accounts.
-- If you do not need your real session, run Firefox with a dedicated profile
-  (`FIREFOX_PROFILE=/path/to/profile`, or `firefox -P`) instead of your default
-  one.
 - `firefox_mask_automation` exists because some legitimate sites (airlines,
   banks) block automated browsers outright. It changes only `navigator.webdriver`
   for the current session; use it only where you would browse manually.
+
+An isolated profile limits the blast radius of injection, but it is not a
+sandbox: the agent still controls everything inside that browser, and it can
+reach any site you sign in to there.
 
 Please report security issues privately via GitHub's **Security → Report a
 vulnerability** flow, not a public issue. See [SECURITY.md](SECURITY.md).
@@ -127,10 +203,13 @@ vulnerability** flow, not a public issue. See [SECURITY.md](SECURITY.md).
 - Firefox allows **one** BiDi session at a time, and it does not release the
   session when a client disconnects. If OpenCode is killed hard, the next
   connection fails with `Maximum number of active sessions`; `firefox_restart`
-  clears it.
-- `firefox_restart` kills every Firefox process (`pkill -x firefox` /
-  `taskkill /IM firefox.exe /F`) and reopens the last URL. Other tabs are lost —
-  use it only to recover.
+  clears it when the plugin launched the browser. If you started Firefox
+  yourself, quit that Firefox and relaunch it with the debugging port.
+- `firefox_restart` stops the Firefox the plugin launched, matched by profile,
+  so your normal browser keeps running. With `defaultProfile: true` there is
+  no profile to match, so it falls back to killing every Firefox process
+  (`pkill -x firefox` / `taskkill /IM firefox.exe /F`). Unsaved tabs in that
+  instance are lost — use it only to recover.
 - The plugin has no network interception, download handling, or multi-browser
   abstraction. It is a small, intentionally direct Firefox driver.
 - Firefox stopped shipping CDP, so Chrome DevTools-based tooling cannot attach

@@ -1,7 +1,7 @@
 {
   "name": "opencode-firefox",
   "version": "0.1.0",
-  "description": "OpenCode plugin that drives your real Firefox over WebDriver BiDi — existing logins, no extension, no browser tooling.",
+  "description": "OpenCode plugin that drives Firefox over WebDriver BiDi — attach to your real session or launch an isolated profile. No extension, no browser tooling.",
   "type": "module",
   "license": "MIT",
   "author": "Yuval Rimar",

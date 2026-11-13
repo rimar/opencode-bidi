@@ -19,8 +19,12 @@ Include the version, your OS, steps to reproduce, and the impact you expect.
 - **Prompt injection.** Page content can contain instructions aimed at the
   agent. Treat pages you did not write as untrusted input, and review actions
   that touch money, credentials, or account settings.
-- **Existing sessions.** The plugin uses the profile Firefox was started with.
-  A dedicated profile limits the blast radius; see the README.
+- **Existing sessions are opt-in.** A plugin-launched browser uses an isolated
+  profile by default. The agent only gets your normal profile when it attaches
+  to a Firefox you started, or when `defaultProfile: true` (or
+  `FIREFOX_DEFAULT_PROFILE=1`) is set. An
+  isolated profile limits the blast radius but is still a browser the agent
+  fully controls.
 - **`firefox_mask_automation`.** This tool hides `navigator.webdriver` to get
   past bot checks on sites that block automation. Use it only where you would
   browse manually and where doing so does not violate the site's terms.

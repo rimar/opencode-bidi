@@ -8,19 +8,79 @@
  * directly. It keeps one session for the lifetime of the plugin and can
  * launch/restart Firefox when needed.
  *
- * Environment:
- *   FIREFOX_BIDI_PORT   default 9222
- *   FIREFOX_BIN         default auto-detected (see firefoxBinary)
- *   FIREFOX_PROFILE     optional -profile argument
+ * Configuration comes from the plugin options in opencode.jsonc, with
+ * environment variables as a fallback:
+ *
+ *   option           env                        meaning
+ *   port             FIREFOX_BIDI_PORT          debugging port (default 9222)
+ *   binary           FIREFOX_BIN                Firefox executable (auto-detected)
+ *   profile          FIREFOX_PROFILE            launch with this profile directory
+ *   defaultProfile   FIREFOX_DEFAULT_PROFILE    launch with the user's normal profile
+ *
+ * With no profile option the plugin launches an isolated, managed profile.
  */
 
 import { Plugin } from "@opencode/plugin";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 const HOST = "127.0.0.1";
-const PORT = Number(process.env.FIREFOX_BIDI_PORT ?? 9222);
-const WS_URL = `ws://${HOST}:${PORT}/session`;
-const HTTP_URL = `http://${HOST}:${PORT}/`;
+
+/**
+ * Plugin options come from the object form in opencode.jsonc:
+ *
+ *   "plugins": [{ "package": "opencode-firefox", "options": { ... } }]
+ *
+ * Environment variables are a fallback so CI and shell wrappers keep working.
+ * Options win when both are set.
+ */
+export type Settings = {
+  port: number;
+  binary?: string;
+  profile?: string;
+  defaultProfile: boolean;
+};
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function positiveInteger(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? parsed : undefined;
+}
+
+function truthy(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value !== "string") return false;
+  return /^(1|true|yes|on)$/i.test(value);
+}
+
+export function resolveSettings(
+  env: NodeJS.ProcessEnv = process.env,
+  options: Record<string, unknown> = {},
+): Settings {
+  return {
+    port: positiveInteger(options.port) ?? positiveInteger(env.FIREFOX_BIDI_PORT) ?? 9222,
+    binary: nonEmptyString(options.binary) ?? nonEmptyString(env.FIREFOX_BIN),
+    profile: nonEmptyString(options.profile) ?? nonEmptyString(env.FIREFOX_PROFILE),
+    defaultProfile:
+      typeof options.defaultProfile === "boolean"
+        ? options.defaultProfile
+        : truthy(env.FIREFOX_DEFAULT_PROFILE),
+  };
+}
+
+let settings = resolveSettings();
+
+function wsUrl(): string {
+  return `ws://${HOST}:${settings.port}/session`;
+}
+
+function httpUrl(): string {
+  return `http://${HOST}:${settings.port}/`;
+}
 
 type Json = any;
 
@@ -59,16 +119,17 @@ class BidiClient {
   }
 
   static async connect(timeoutMs = 10000): Promise<BidiClient> {
-    const ws = new WebSocket(WS_URL);
+    const url = wsUrl();
+    const ws = new WebSocket(url);
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Timeout connecting to ${WS_URL}`)), timeoutMs);
+      const timer = setTimeout(() => reject(new Error(`Timeout connecting to ${url}`)), timeoutMs);
       ws.addEventListener("open", () => {
         clearTimeout(timer);
         resolve();
       });
       ws.addEventListener("error", () => {
         clearTimeout(timer);
-        reject(new Error(`Cannot connect to ${WS_URL}`));
+        reject(new Error(`Cannot connect to ${url}`));
       });
     });
 
@@ -150,12 +211,13 @@ class BidiClient {
 let client: BidiClient | null = null;
 let connecting: Promise<BidiClient> | null = null;
 let preferredContext: string | null = null;
+let launchedPid: number | null = null;
 
 async function httpUp(timeoutMs = 1000): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const response = await fetch(HTTP_URL, { signal: controller.signal });
+    const response = await fetch(httpUrl(), { signal: controller.signal });
     clearTimeout(timer);
     return response.status < 500;
   } catch {
@@ -164,7 +226,7 @@ async function httpUp(timeoutMs = 1000): Promise<boolean> {
 }
 
 function firefoxBinary(): string {
-  if (process.env.FIREFOX_BIN) return process.env.FIREFOX_BIN;
+  if (settings.binary) return settings.binary;
   const candidates = [
     "/usr/lib/firefox/firefox",
     "/usr/bin/firefox",
@@ -176,40 +238,117 @@ function firefoxBinary(): string {
   const found = candidates.find((path) => existsSync(path));
   if (!found) {
     throw new Error(
-      `Firefox binary not found. Set FIREFOX_BIN to the Firefox executable. Tried:\n  ${candidates.join("\n  ")}`,
+      `Firefox binary not found. Set the "binary" option (or FIREFOX_BIN) to the Firefox executable. Tried:\n  ${candidates.join("\n  ")}`,
     );
   }
   return found;
 }
 
-async function startFirefox(url?: string): Promise<string> {
+export type LaunchProfile = { dir?: string; label: string };
+
+/**
+ * Decide which profile the plugin uses when it launches Firefox.
+ *
+ * Attaching to an already-running Firefox is unaffected: the browser keeps
+ * whatever profile the user started it with.
+ *
+ * Precedence:
+ *   profile=<dir>         explicit profile
+ *   defaultProfile=true   the user's normal Firefox profile
+ *   (neither)             plugin-managed, isolated profile
+ */
+export function resolveLaunchProfile(
+  config: Pick<Settings, "profile" | "defaultProfile">,
+  platform: NodeJS.Platform,
+  home: string,
+  snapFirefox = false,
+  env: NodeJS.ProcessEnv = process.env,
+): LaunchProfile {
+  if (config.profile) return { dir: config.profile, label: `profile ${config.profile}` };
+  if (config.defaultProfile) return { label: "your default Firefox profile" };
+
+  const dir =
+    platform === "win32"
+      ? join(env.LOCALAPPDATA || join(home, "AppData", "Local"), "opencode-firefox", "profile")
+      : platform === "darwin"
+        ? join(home, "Library", "Application Support", "opencode-firefox", "profile")
+        : snapFirefox
+          ? // Snap Firefox is confined to its own home; anything under ~/.local is invisible to it.
+            join(home, "snap", "firefox", "common", "opencode-firefox", "profile")
+          : join(env.XDG_DATA_HOME || join(home, ".local", "share"), "opencode-firefox", "profile");
+
+  return { dir, label: `isolated profile ${dir}` };
+}
+
+function isSnapBinary(bin: string): boolean {
+  try {
+    return realpathSync(bin).includes("/snap/");
+  } catch {
+    return bin.includes("/snap/");
+  }
+}
+
+function currentLaunchProfile(): LaunchProfile {
+  let snap = false;
+  try {
+    snap = isSnapBinary(firefoxBinary());
+  } catch {
+    // No binary found. That only blocks launching, not the profile decision.
+  }
+  return resolveLaunchProfile(settings, process.platform, homedir(), snap);
+}
+
+async function startFirefox(url?: string): Promise<{ bin: string; profile: LaunchProfile }> {
   const { spawn } = await import("node:child_process");
   const bin = firefoxBinary();
-  const args = [`--remote-debugging-port`, String(PORT), "--width", "1600", "--height", "1000"];
-  if (process.env.FIREFOX_PROFILE) args.push("-profile", process.env.FIREFOX_PROFILE);
+  const profile = currentLaunchProfile();
+  const args = [`--remote-debugging-port`, String(settings.port), "--width", "1600", "--height", "1000"];
+  if (profile.dir) {
+    mkdirSync(profile.dir, { recursive: true });
+    args.push("-profile", profile.dir);
+  }
   args.push(url || "about:blank");
 
   const child = spawn(bin, args, { detached: true, stdio: "ignore", env: process.env });
   child.unref();
+  launchedPid = child.pid ?? null;
 
   const deadline = Date.now() + 25000;
   while (Date.now() < deadline) {
-    if (await httpUp(500)) return bin;
+    if (await httpUp(500)) return { bin, profile };
     await sleep(400);
   }
-  throw new Error(`Firefox did not expose port ${PORT} within 25s (binary: ${bin}).`);
+  throw new Error(`Firefox did not expose port ${settings.port} within 25s (binary: ${bin}).`);
 }
 
-async function stopFirefox(): Promise<void> {
+async function stopFirefox(profile: LaunchProfile): Promise<void> {
   const { spawn } = await import("node:child_process");
   const windows = process.platform === "win32";
-  const command = windows ? "taskkill" : "pkill";
-  const args = windows ? ["/IM", "firefox.exe", "/F"] : ["-x", "firefox"];
+
+  let command: string;
+  let args: string[];
+  if (windows) {
+    command = "taskkill";
+    args = launchedPid ? ["/PID", String(launchedPid), "/F", "/T"] : ["/IM", "firefox.exe", "/F"];
+  } else if (profile.dir) {
+    const pattern = `profile ${profile.dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`;
+    command = "pkill";
+    args = ["-f", pattern];
+  } else if (launchedPid) {
+    command = "kill";
+    args = [String(launchedPid)];
+  } else {
+    command = "pkill";
+    args = ["-x", "firefox"];
+  }
+
   await new Promise<void>((resolve) => {
     const child = spawn(command, args, { stdio: "ignore" });
     child.on("exit", () => resolve());
     child.on("error", () => resolve());
   });
+  launchedPid = null;
+
   // wait for the port to disappear
   for (let i = 0; i < 25; i++) {
     if (!(await httpUp(300))) return;
@@ -665,6 +804,8 @@ async function listTabs(): Promise<Array<{ index: number; id: string; url: strin
 export default Plugin.define({
   id: "firefox-bidi",
   async setup(ctx) {
+    settings = resolveSettings(process.env, ctx.options);
+
     await ctx.tool.transform((editor) => {
       editor.namespace({
         name: "firefox",
@@ -684,7 +825,7 @@ export default Plugin.define({
         input: { type: "object", properties: {}, additionalProperties: false },
         execute: async () => {
           const up = await httpUp();
-          if (!up) return { content: `Firefox debugging port ${PORT} is not reachable. Use firefox_start to launch it.` };
+          if (!up) return { content: `Firefox debugging port ${settings.port} is not reachable. Use firefox_start to launch it.` };
           let session = "attached";
           let tabs = "";
           try {
@@ -695,13 +836,14 @@ export default Plugin.define({
             session = "not attached";
             tabs = (error as Error).message;
           }
-          return { content: `port ${PORT}: up\nsession: ${session}\ntabs:\n${tabs}` };
+          return { content: `port ${settings.port}: up\nsession: ${session}\ntabs:\n${tabs}` };
         },
       });
 
       add({
         name: "start",
-        description: "Launch Firefox with remote debugging if it is not already running. Optionally opens a URL.",
+        description:
+          "Launch Firefox with remote debugging if it is not already running. Uses an isolated profile by default; set the plugin's profile/defaultProfile options to change that.",
         input: {
           type: "object",
           properties: { url: { type: "string", description: "Optional URL to open." } },
@@ -711,11 +853,13 @@ export default Plugin.define({
           const { url } = input as { url?: string };
           if (await httpUp()) {
             await getClient();
-            return { content: `Firefox already running on port ${PORT}; session attached.` };
+            return { content: `Firefox already running on port ${settings.port}; session attached.` };
           }
-          const bin = await startFirefox(url);
+          const launched = await startFirefox(url);
           await getClient();
-          return { content: `Started ${bin} with remote debugging on port ${PORT}.` };
+          return {
+            content: `Started ${launched.bin} with remote debugging on port ${settings.port} using ${launched.profile.label}.`,
+          };
         },
       });
 
@@ -746,10 +890,19 @@ export default Plugin.define({
             client = null;
           }
           preferredContext = null;
-          await stopFirefox();
-          const bin = await startFirefox(reopen);
+          const profile = currentLaunchProfile();
+          await stopFirefox(profile);
+          if (await httpUp(300)) {
+            throw new Error(
+              `Firefox is still running on port ${settings.port} after the restart attempt. It was not started by this plugin, ` +
+                `so restart it yourself with: firefox --remote-debugging-port ${settings.port}`,
+            );
+          }
+          const launched = await startFirefox(reopen);
           await getClient();
-          return { content: `Restarted Firefox (${bin})${reopen ? ` and reopened ${reopen}` : ""}.` };
+          return {
+            content: `Restarted Firefox (${launched.bin}) using ${launched.profile.label}${reopen ? ` and reopened ${reopen}` : ""}.`,
+          };
         },
       });
 
