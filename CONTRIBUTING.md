@@ -26,7 +26,7 @@ Point OpenCode at your checkout:
 
 ```jsonc
 {
-  "plugins": ["/absolute/path/to/opencode-firefox"]
+  "plugins": ["/absolute/path/to/opencode-bidi"]
 }
 ```
 

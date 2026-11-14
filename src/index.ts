@@ -30,7 +30,7 @@ const HOST = "127.0.0.1";
 /**
  * Plugin options come from the object form in opencode.jsonc:
  *
- *   "plugins": [{ "package": "opencode-firefox", "options": { ... } }]
+ *   "plugins": [{ "package": "opencode-bidi", "options": { ... } }]
  *
  * Environment variables are a fallback so CI and shell wrappers keep working.
  * Options win when both are set.
@@ -269,13 +269,13 @@ export function resolveLaunchProfile(
 
   const dir =
     platform === "win32"
-      ? join(env.LOCALAPPDATA || join(home, "AppData", "Local"), "opencode-firefox", "profile")
+      ? join(env.LOCALAPPDATA || join(home, "AppData", "Local"), "opencode-bidi", "profile")
       : platform === "darwin"
-        ? join(home, "Library", "Application Support", "opencode-firefox", "profile")
+        ? join(home, "Library", "Application Support", "opencode-bidi", "profile")
         : snapFirefox
           ? // Snap Firefox is confined to its own home; anything under ~/.local is invisible to it.
-            join(home, "snap", "firefox", "common", "opencode-firefox", "profile")
-          : join(env.XDG_DATA_HOME || join(home, ".local", "share"), "opencode-firefox", "profile");
+            join(home, "snap", "firefox", "common", "opencode-bidi", "profile")
+          : join(env.XDG_DATA_HOME || join(home, ".local", "share"), "opencode-bidi", "profile");
 
   return { dir, label: `isolated profile ${dir}` };
 }

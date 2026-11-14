@@ -1,12 +1,14 @@
-# opencode-firefox
+# opencode-bidi
 
-[![npm](https://img.shields.io/npm/v/opencode-firefox?color=2563eb)](https://www.npmjs.com/package/opencode-firefox)
-[![CI](https://github.com/rimar/opencode-firefox/actions/workflows/ci.yml/badge.svg)](https://github.com/rimar/opencode-firefox/actions/workflows/ci.yml)
+Firefox browser automation for OpenCode, over WebDriver BiDi.
+
+[![npm](https://img.shields.io/npm/v/opencode-bidi?color=2563eb)](https://www.npmjs.com/package/opencode-bidi)
+[![CI](https://github.com/rimar/opencode-bidi/actions/workflows/ci.yml/badge.svg)](https://github.com/rimar/opencode-bidi/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Give your OpenCode agent a real Firefox to drive.
 
-`opencode-firefox` is an [OpenCode](https://opencode.ai) plugin that talks to
+`opencode-bidi` is an [OpenCode](https://opencode.ai) plugin that talks to
 Firefox over **WebDriver BiDi**. If Firefox is already running with remote
 debugging, it attaches to it and uses that session — cookies, logins, open tabs.
 If not, it launches its own copy with a separate profile, so it never touches
@@ -34,22 +36,25 @@ agent:  firefox_navigate → firefox_snapshot → firefox_click → firefox_fill
 
 ## Requirements
 
-- Firefox 100 or newer (WebDriver BiDi)
+- Firefox 129 or newer (the first release with WebDriver BiDi enabled by
+  default)
 - OpenCode 2.x
-- Linux, macOS, or Windows. Tested on Linux; the macOS/Windows paths use the
-  standard Firefox install locations and `taskkill` for restart.
+- Linux, macOS, or Windows. Only Linux is tested. The macOS and Windows code
+  paths use the standard Firefox install locations and `taskkill` for restart,
+  but nobody has verified them on a real machine yet — treat them as untested
+  and please report what breaks.
 
 ## Install
 
 ### With the OpenCode CLI
 
 ```sh
-opencode plugin add opencode-firefox
+opencode plugin add opencode-bidi
 ```
 
 This installs the package and adds it to your global
 `~/.config/opencode/opencode.jsonc`. Pin a release with
-`opencode plugin add opencode-firefox@0.1.1`.
+`opencode plugin add opencode-bidi@0.1.2`.
 
 Manage it with:
 
@@ -57,7 +62,7 @@ Manage it with:
 opencode plugin list                   # installed plugins
 opencode plugin check                  # check for updates
 opencode plugin update                 # update package plugins
-opencode plugin remove opencode-firefox
+opencode plugin remove opencode-bidi
 ```
 
 `plugin add` only writes global configuration. For a project-local install,
@@ -74,7 +79,7 @@ Add the plugin to `opencode.jsonc` — global or project:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-firefox"]
+  "plugins": ["opencode-bidi"]
 }
 ```
 
@@ -85,14 +90,14 @@ To use a local checkout during development:
 
 ```jsonc
 {
-  "plugins": ["/absolute/path/to/opencode-firefox"]
+  "plugins": ["/absolute/path/to/opencode-bidi"]
 }
 ```
 
 Then pick how Firefox starts:
 
 - **Let the agent launch it** — run `firefox_start`. It uses an isolated profile
-  (`~/.local/share/opencode-firefox/profile` on Linux) that can run next to your
+  (`~/.local/share/opencode-bidi/profile` on Linux) that can run next to your
   normal Firefox. Nothing is shared with your personal session.
 - **Attach to your real session** — start Firefox yourself with the port open:
 
@@ -116,7 +121,7 @@ Configure the plugin through the object form in `opencode.jsonc`:
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "opencode-firefox",
+      "package": "opencode-bidi",
       "options": {
         "port": 9222,
         "binary": "/usr/lib/firefox/firefox",
@@ -162,10 +167,10 @@ picks a profile in this order:
 
    | Platform | Location |
    |---|---|
-   | Linux | `$XDG_DATA_HOME/opencode-firefox/profile` (default `~/.local/share/...`) |
-   | Linux (snap Firefox) | `~/snap/firefox/common/opencode-firefox/profile` |
-   | macOS | `~/Library/Application Support/opencode-firefox/profile` |
-   | Windows | `%LOCALAPPDATA%\opencode-firefox\profile` |
+   | Linux | `$XDG_DATA_HOME/opencode-bidi/profile` (default `~/.local/share/...`) |
+   | Linux (snap Firefox) | `~/snap/firefox/common/opencode-bidi/profile` |
+   | macOS | `~/Library/Application Support/opencode-bidi/profile` |
+   | Windows | `%LOCALAPPDATA%\opencode-bidi\profile` |
 
    It starts with no cookies or logins and runs alongside your normal Firefox.
    It persists between launches, so sites you sign in to there stay signed in.
@@ -229,6 +234,20 @@ reach any site you sign in to there.
 Please report security issues privately via GitHub's **Security → Report a
 vulnerability** flow, not a public issue. See [SECURITY.md](SECURITY.md).
 
+## Use responsibly
+
+This plugin drives *your* Firefox, with *your* logins. Whether automation is
+allowed is up to each site — check its terms before pointing this at an account
+or service that forbids it.
+
+`firefox_mask_automation` is off by default. It makes an automated session look
+like a normal browser, which is a gray area: some sites break for no good
+reason, and that's why it exists. If you use it to get around a site's rules,
+that's your call and your responsibility, not the plugin's.
+
+Firefox is a trademark of Mozilla.org in the US and other countries. This
+project is not affiliated with, endorsed by, or sponsored by Mozilla.
+
 ## Notes and limitations
 
 - Firefox allows **one** BiDi session at a time, and it does not release the
@@ -267,3 +286,6 @@ directory (see [Install](#install)) or link it with `npm link`.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+Firefox is a trademark of Mozilla.org in the US and other countries. This
+project is not affiliated with, endorsed by, or sponsored by Mozilla.

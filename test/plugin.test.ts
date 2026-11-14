@@ -66,31 +66,31 @@ test("registers the firefox tool namespace", async () => {
 });
 
 test("launch profile defaults to an isolated, plugin-managed profile", () => {
-  const linux = join("/home/me", ".local", "share", "opencode-firefox", "profile");
+  const linux = join("/home/me", ".local", "share", "opencode-bidi", "profile");
   assert.deepEqual(resolveLaunchProfile(MANAGED, "linux", "/home/me"), {
     dir: linux,
     label: `isolated profile ${linux}`,
   });
   assert.equal(
     resolveLaunchProfile(MANAGED, "linux", "/home/me", false, { XDG_DATA_HOME: "/data" }).dir,
-    join("/data", "opencode-firefox", "profile"),
+    join("/data", "opencode-bidi", "profile"),
   );
   assert.equal(
     resolveLaunchProfile(MANAGED, "darwin", "/Users/me").dir,
-    join("/Users/me", "Library", "Application Support", "opencode-firefox", "profile"),
+    join("/Users/me", "Library", "Application Support", "opencode-bidi", "profile"),
   );
   assert.equal(
     resolveLaunchProfile(MANAGED, "win32", "C:\\Users\\me", false, {
       LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local",
     }).dir,
-    join("C:\\Users\\me\\AppData\\Local", "opencode-firefox", "profile"),
+    join("C:\\Users\\me\\AppData\\Local", "opencode-bidi", "profile"),
   );
 });
 
 test("a snap-packaged Firefox gets a profile inside its confined home", () => {
   assert.equal(
     resolveLaunchProfile(MANAGED, "linux", "/home/me", true).dir,
-    join("/home/me", "snap", "firefox", "common", "opencode-firefox", "profile"),
+    join("/home/me", "snap", "firefox", "common", "opencode-bidi", "profile"),
   );
 });
 
