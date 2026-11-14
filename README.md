@@ -46,7 +46,7 @@ opencode plugin add opencode-bidi
 
 That installs the package and adds it to your global
 `~/.config/opencode/opencode.jsonc`. You can pin a release with
-`opencode plugin add opencode-bidi@0.1.3`.
+`opencode plugin add opencode-bidi@0.1.4`.
 
 Other commands:
 
@@ -228,7 +228,7 @@ vulnerability** flow, not a public issue. See [SECURITY.md](SECURITY.md).
 ## Use responsibly
 
 This plugin drives *your* Firefox, with *your* logins. Whether automation is
-allowed is up to each site — check its terms before pointing this at an account
+allowed is up to each site. Check its terms before pointing this at an account
 or service that forbids it.
 
 `firefox_mask_automation` is off by default. It makes an automated session look

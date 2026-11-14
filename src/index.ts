@@ -153,7 +153,7 @@ class BidiClient {
     if (/Maximum number of active sessions|session already started/i.test(lastError?.message ?? "")) {
       throw new Error(
         "Firefox already has an active debugging session (left behind by a disconnected client, e.g. a previous OpenCode run). " +
-          "Run firefox_restart to recover — it reopens the current page.",
+          "Run firefox_restart to recover. It reopens the current page.",
       );
     }
     throw lastError ?? new Error("Could not start a Firefox BiDi session.");
@@ -831,7 +831,7 @@ const plugin: Plugin.Plugin = {
           try {
             await getClient();
             const list = await listTabs();
-            tabs = list.map((t) => `${t.index}: ${t.title || "(untitled)"} — ${t.url}`).join("\n") || "(no tabs)";
+            tabs = list.map((t) => `${t.index}: ${t.title || "(untitled)"} - ${t.url}`).join("\n") || "(no tabs)";
           } catch (error) {
             session = "not attached";
             tabs = (error as Error).message;
@@ -1093,18 +1093,18 @@ const plugin: Plugin.Plugin = {
           const { action, target } = input as { action?: string; target?: string };
           const tabs = await listTabs();
           if (!action || action === "list") {
-            return { content: tabs.map((t) => `${t.index}: ${t.title || "(untitled)"} — ${t.url}`).join("\n") || "(no tabs)" };
+            return { content: tabs.map((t) => `${t.index}: ${t.title || "(untitled)"} - ${t.url}`).join("\n") || "(no tabs)" };
           }
           const found = tabs.find((t) => String(t.index) === String(target) || t.id === target);
           if (!found) throw new Error(`No tab matching ${target}. Tabs: ${tabs.map((t) => t.index).join(", ")}`);
           if (action === "switch") {
             preferredContext = found.id;
             await cmd("browsingContext.activate", { context: found.id });
-            return { content: `switched to ${found.index}: ${found.title} — ${found.url}` };
+            return { content: `switched to ${found.index}: ${found.title} - ${found.url}` };
           }
           await cmd("browsingContext.close", { context: found.id });
           if (preferredContext === found.id) preferredContext = null;
-          return { content: `closed ${found.index}: ${found.title} — ${found.url}` };
+          return { content: `closed ${found.index}: ${found.title} - ${found.url}` };
         },
       });
     });
