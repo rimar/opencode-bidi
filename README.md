@@ -13,8 +13,9 @@ open tabs. If it isn't, the plugin can launch its own copy with a separate
 profile, so it leaves your normal browser alone. There's no extension, no
 Playwright, and no Selenium.
 
-Previously published as `opencode-firefox`. That package is deprecated and
-points here.
+Filling a form with `firefox_fill` and `firefox_click`:
+
+![Filling a form with opencode-bidi](https://raw.githubusercontent.com/rimar/opencode-bidi/main/docs/demo.gif)
 
 ## Why
 
@@ -46,7 +47,7 @@ opencode plugin add opencode-bidi
 
 That installs the package and adds it to your global
 `~/.config/opencode/opencode.jsonc`. You can pin a release with
-`opencode plugin add opencode-bidi@0.1.4`.
+`opencode plugin add opencode-bidi@0.1.5`.
 
 Other commands:
 
@@ -279,6 +280,3 @@ To try a local checkout in OpenCode, point `plugins` at the repository directory
 MIT. See [LICENSE](LICENSE).
 
 This plugin is not affiliated with the OpenCode project.
-
-Firefox is a trademark of Mozilla.org in the US and other countries. This
-project is not affiliated with, endorsed by, or sponsored by Mozilla.
