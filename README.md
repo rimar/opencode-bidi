@@ -13,9 +13,9 @@ open tabs. If it isn't, the plugin can launch its own copy with a separate
 profile, so it leaves your normal browser alone. There's no extension, no
 Playwright, and no Selenium.
 
-Filling a form with `firefox_fill` and `firefox_click`:
+Navigating, taking snapshots, filling a form, and clicking through it:
 
-![Filling a form with opencode-bidi](https://raw.githubusercontent.com/rimar/opencode-bidi/main/docs/demo.gif)
+[![Filling a form with opencode-bidi](https://raw.githubusercontent.com/rimar/opencode-bidi/main/docs/demo.gif)](https://raw.githubusercontent.com/rimar/opencode-bidi/main/docs/demo.gif)
 
 ## Why
 
@@ -47,7 +47,7 @@ opencode plugin add opencode-bidi
 
 That installs the package and adds it to your global
 `~/.config/opencode/opencode.jsonc`. You can pin a release with
-`opencode plugin add opencode-bidi@0.1.5`.
+`opencode plugin add opencode-bidi@0.1.6`.
 
 Other commands:
 
