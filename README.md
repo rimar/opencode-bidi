@@ -6,75 +6,67 @@ Firefox browser automation for OpenCode, over WebDriver BiDi.
 [![CI](https://github.com/rimar/opencode-bidi/actions/workflows/ci.yml/badge.svg)](https://github.com/rimar/opencode-bidi/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Give your OpenCode agent a real Firefox to drive.
+`opencode-bidi` is an [OpenCode](https://opencode.ai) plugin that connects to
+Firefox through WebDriver BiDi. If Firefox is already running with remote
+debugging on, the plugin attaches to it and uses that session: cookies, logins,
+open tabs. If it isn't, the plugin can launch its own copy with a separate
+profile, so it leaves your normal browser alone. There's no extension, no
+Playwright, and no Selenium.
 
-`opencode-bidi` is an [OpenCode](https://opencode.ai) plugin that talks to
-Firefox over **WebDriver BiDi**. If Firefox is already running with remote
-debugging, it attaches to it and uses that session — cookies, logins, open tabs.
-If not, it launches its own copy with a separate profile, so it never touches
-your normal browser by accident. No extension, no Playwright, no Selenium.
-
-```text
-you:    book the cheapest direct flight on Friday
-agent:  firefox_navigate → firefox_snapshot → firefox_click → firefox_fill
-        (already signed in, no login wall, no CAPTCHA detour)
-```
+Previously published as `opencode-firefox`. That package is deprecated and
+points here.
 
 ## Why
 
-- **Your session when you want it.** Attach to the Firefox you are already
-  using, and sites you are signed in to stay signed in. When the plugin has to
-  launch a browser, it uses a separate profile instead of hijacking yours.
-- **Zero browser tooling.** One WebSocket to Firefox's BiDi endpoint and plain
-  JavaScript in the page. No driver to install, no extension to keep updated,
-  no Playwright version to match.
-- **Made for agents.** A compact page snapshot with numbered refs (`e0`, `e1`,
-  …) that `click` and `fill` accept, plus visible text. Small, stable tool
-  surface instead of a giant automation API.
-- **Firefox-first.** Firefox stopped shipping CDP; most "AI browser" tooling
-  still assumes Chrome. This speaks the protocol Firefox actually exposes.
+Firefox stopped shipping CDP, so most Chrome DevTools-based automation can't
+talk to it. This plugin uses the protocol Firefox does expose. One WebSocket to
+the BiDi endpoint and plain JavaScript in the page is enough. There's no driver
+to install and no extension to keep updated.
+
+It also keeps the tool surface small. The snapshot gives the agent numbered refs
+(`e0`, `e1`, ...) that `firefox_click` and `firefox_fill` accept, which tends to
+work better than exposing a large automation API.
 
 ## Requirements
 
-- Firefox 129 or newer (the first release with WebDriver BiDi enabled by
-  default)
-- OpenCode 2.x
-- Linux, macOS, or Windows. Only Linux is tested. The macOS and Windows code
-  paths use the standard Firefox install locations and `taskkill` for restart,
-  but nobody has verified them on a real machine yet — treat them as untested
-  and please report what breaks.
+- Firefox 129 or newer. WebDriver BiDi is on by default starting with 129.
+- OpenCode 2.x.
+- Linux, macOS, or Windows. I've only tested Linux. The macOS and Windows paths
+  use the standard Firefox install locations and `taskkill` for restarts, but
+  nobody has run them on a real machine yet. If you do, please open an issue and
+  tell me what broke.
 
 ## Install
 
-### With the OpenCode CLI
+### OpenCode CLI
 
 ```sh
 opencode plugin add opencode-bidi
 ```
 
-This installs the package and adds it to your global
-`~/.config/opencode/opencode.jsonc`. Pin a release with
-`opencode plugin add opencode-bidi@0.1.2`.
+That installs the package and adds it to your global
+`~/.config/opencode/opencode.jsonc`. You can pin a release with
+`opencode plugin add opencode-bidi@0.1.3`.
 
-Manage it with:
+Other commands:
 
 ```sh
-opencode plugin list                   # installed plugins
-opencode plugin check                  # check for updates
-opencode plugin update                 # update package plugins
+opencode plugin list
+opencode plugin check
+opencode plugin update
 opencode plugin remove opencode-bidi
 ```
 
-`plugin add` only writes global configuration. For a project-local install,
-edit the project's `opencode.jsonc` instead (next section).
+`plugin add` only writes global config. For a project-local install, edit the
+project's `opencode.jsonc` instead.
 
 If you previously copied `firefox-bidi.ts` into `~/.config/opencode/plugins/`,
-remove it after installing the package, otherwise both register the same
+remove it after installing the package. Both would register the same
 `firefox.*` tools.
 
-### With configuration
+### Manual config
 
-Add the plugin to `opencode.jsonc` — global or project:
+Add the plugin to `opencode.jsonc`, global or project:
 
 ```jsonc
 {
@@ -83,10 +75,8 @@ Add the plugin to `opencode.jsonc` — global or project:
 }
 ```
 
-OpenCode installs the package automatically. To pass plugin options, use the
-object form described in [Configuration](#configuration).
-
-To use a local checkout during development:
+OpenCode installs the package on its next run. To use a local checkout during
+development:
 
 ```jsonc
 {
@@ -94,27 +84,27 @@ To use a local checkout during development:
 }
 ```
 
-Then pick how Firefox starts:
+Then pick how Firefox starts.
 
-- **Let the agent launch it** — run `firefox_start`. It uses an isolated profile
-  (`~/.local/share/opencode-bidi/profile` on Linux) that can run next to your
-  normal Firefox. Nothing is shared with your personal session.
-- **Attach to your real session** — start Firefox yourself with the port open:
+**Let the agent launch it.** Run `firefox_start`. By default it uses an isolated
+profile at `~/.local/share/opencode-bidi/profile` on Linux. That profile can run
+next to your normal Firefox and doesn't share anything with your personal
+session.
 
-  ```sh
-  firefox --remote-debugging-port 9222
-  ```
+**Attach to your real session.** Start Firefox yourself with the port open:
 
-  The plugin attaches to whatever Firefox owns that port, with whatever profile
-  it was started with. If Firefox is already open without the flag, the new
-  process can forward to the existing instance and the port never opens — quit
-  Firefox first, or start a separate profile.
+```sh
+firefox --remote-debugging-port 9222
+```
 
-See [Profiles](#profiles-which-firefox-the-agent-gets) for the full rules.
+The plugin attaches to whatever Firefox owns that port, using whatever profile
+it was started with. One catch: if Firefox is already open without the flag, the
+new process can hand off to the existing instance and the port never opens. Quit
+Firefox first, or start a separate profile.
 
 ## Configuration
 
-Configure the plugin through the object form in `opencode.jsonc`:
+Configure the plugin with the object form in `opencode.jsonc`:
 
 ```jsonc
 {
@@ -140,30 +130,30 @@ Configure the plugin through the object form in `opencode.jsonc`:
 | `profile` | `FIREFOX_PROFILE` | isolated profile | `-profile` directory used when the plugin launches Firefox |
 | `defaultProfile` | `FIREFOX_DEFAULT_PROFILE` | `false` | Launch with your normal Firefox profile instead of an isolated one |
 
-Options win when both are set; the environment variables are there for CI and
-shell wrappers. Settings are read when the plugin loads, so save the config to
-reload it (or run `/reload`).
+Options win when both are set. The environment variables are mostly there for
+CI and shell wrappers. Settings are read when the plugin loads, so save the
+config and reload the plugin (or run `/reload`) after changing them.
 
-### Profiles: which Firefox the agent gets
+### Which profile gets used
 
-Attaching is not affected by these settings. If Firefox already has the
-debugging port open, the plugin uses that instance with whatever profile it was
-started with.
+This only matters when the plugin launches Firefox (`firefox_start`,
+`firefox_restart`). If Firefox already has the debugging port open, the plugin
+attaches to that instance and uses whatever profile it was started with.
 
-When the plugin **launches** Firefox (`firefox_start`, `firefox_restart`) it
-picks a profile in this order:
+The plugin picks a profile in this order:
 
-1. **`profile: "/path/to/dir"`** — that profile. Create one with
-   `firefox -P` → **Create Profile…**, then read its **Root Directory** from
-   `about:profiles`. The directory is created if it does not exist.
-2. **`defaultProfile: true`** — no `-profile` flag, so Firefox uses your
-   normal default profile: every cookie, logged-in account, history entry, and
-   extension you browse with. The agent can act as you anywhere you are signed
-   in. It also hits Firefox's single-instance rule (if your normal Firefox is
-   already open, the launch forwards to it and the port never opens), and
-   `firefox_restart` may have to kill every Firefox process because it cannot
-   tell its own instance apart.
-3. **Neither (the default)** — an isolated, plugin-managed profile:
+1. **`profile: "/path/to/dir"`** uses that profile. You can create one with
+   `firefox -P` → **Create Profile...**, then find its **Root Directory** in
+   `about:profiles`. The directory is created if it doesn't exist.
+2. **`defaultProfile: true`** launches without `-profile`, so Firefox uses your
+   normal profile. That includes every cookie, logged-in account, history entry,
+   and extension. The agent can act as you anywhere you're signed in. It also
+   runs into Firefox's single-instance rule: if your normal Firefox is already
+   open, the launch hands off to it and the port never opens. `firefox_restart`
+   may have to kill every Firefox process because it can't tell its own instance
+   apart.
+3. **Neither, which is the default.** The plugin creates and manages an isolated
+   profile:
 
    | Platform | Location |
    |---|---|
@@ -174,10 +164,10 @@ picks a profile in this order:
 
    It starts with no cookies or logins and runs alongside your normal Firefox.
    It persists between launches, so sites you sign in to there stay signed in.
-   This is a separate identity, **not** a sandbox: the agent controls everything
-   inside it.
+   It's a separate identity, not a sandbox. The agent controls everything inside
+   it.
 
-If you start Firefox yourself, pass the profile on that command line instead:
+If you start Firefox yourself, pass the profile on the command line:
 
 ```sh
 firefox -profile /path/to/profile --remote-debugging-port 9222
@@ -185,33 +175,33 @@ firefox -profile /path/to/profile --remote-debugging-port 9222
 
 ## Tools
 
-All tools live in the `firefox` namespace and are also available in Code Mode
-as `tools.firefox.*`.
+All tools are in the `firefox` namespace and are also available in Code Mode as
+`tools.firefox.*`.
 
-| Tool | Purpose |
+| Tool | What it does |
 |---|---|
-| `firefox_status` | Port/session/tab health check; attaches if needed |
-| `firefox_start` | Launch Firefox with debugging if it is not running (isolated profile by default) |
-| `firefox_restart` | Stop and relaunch the Firefox it launched, reopening the current page |
-| `firefox_navigate` | Open a URL, optionally in a new tab |
-| `firefox_snapshot` | URL, title, numbered interactive elements (`e0`, `e1`, …), visible text |
-| `firefox_click` | Click by ref, CSS selector, or visible text / aria-label |
-| `firefox_fill` | Fill input/textarea/select; optionally submit with Enter |
-| `firefox_press` | Enter, Tab, Escape, arrows, PageDown, … |
-| `firefox_eval` | Evaluate JavaScript in the page and return JSON |
-| `firefox_screenshot` | Save a PNG to disk (open it with the `read` tool) |
-| `firefox_tabs` | List, switch, or close tabs |
-| `firefox_bidi` | Escape hatch for any raw BiDi command |
-| `firefox_mask_automation` | Hide `navigator.webdriver` for sites that block automation |
+| `firefox_status` | Port and session health check. Attaches if needed. |
+| `firefox_start` | Launch Firefox with debugging if it isn't already running. Uses an isolated profile by default. |
+| `firefox_restart` | Stop and relaunch the Firefox it launched, reopening the current page. |
+| `firefox_navigate` | Open a URL, optionally in a new tab. |
+| `firefox_snapshot` | URL, title, numbered interactive elements (`e0`, `e1`, ...), and visible text. |
+| `firefox_click` | Click by ref, CSS selector, or visible text / aria-label. |
+| `firefox_fill` | Fill an input, textarea, or select. Can submit with Enter. |
+| `firefox_press` | Enter, Tab, Escape, arrows, PageDown, and so on. |
+| `firefox_eval` | Evaluate JavaScript in the page and return JSON. |
+| `firefox_screenshot` | Save a PNG to disk. Open it with the `read` tool. |
+| `firefox_tabs` | List, switch, or close tabs. |
+| `firefox_bidi` | Escape hatch for any raw BiDi command. |
+| `firefox_mask_automation` | Hide `navigator.webdriver` for sites that block automation. |
 
-Typical loop:
+A typical run looks like this:
 
 ```text
 firefox_navigate → firefox_snapshot → firefox_click / firefox_fill → firefox_snapshot
 ```
 
-Take a fresh snapshot before clicking by ref, because refs point at the page
-state from the last snapshot.
+Take a fresh snapshot before clicking by ref. Refs point at the page state from
+the last snapshot.
 
 ## Security
 
@@ -224,14 +214,15 @@ can try to prompt-inject the agent into acting on your behalf.
   with `defaultProfile: true` (or `FIREFOX_DEFAULT_PROFILE=1`).
 - Prefer sites you trust, and review actions on sensitive accounts.
 - `firefox_mask_automation` exists because some legitimate sites (airlines,
-  banks) block automated browsers outright. It changes only `navigator.webdriver`
-  for the current session; use it only where you would browse manually.
+  banks) block automated browsers outright. It changes only
+  `navigator.webdriver` for the current session. Use it only where you would
+  browse manually.
 
-An isolated profile limits the blast radius of injection, but it is not a
-sandbox: the agent still controls everything inside that browser, and it can
+An isolated profile limits the blast radius of injection, but it isn't a
+sandbox. The agent still controls everything inside that browser, and it can
 reach any site you sign in to there.
 
-Please report security issues privately via GitHub's **Security → Report a
+Please report security issues privately through GitHub's **Security → Report a
 vulnerability** flow, not a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Use responsibly
@@ -250,28 +241,28 @@ project is not affiliated with, endorsed by, or sponsored by Mozilla.
 
 ## Notes and limitations
 
-- Firefox allows **one** BiDi session at a time, and it does not release the
-  session when a client disconnects. If OpenCode is killed hard, the next
-  connection fails with `Maximum number of active sessions`; `firefox_restart`
-  clears it when the plugin launched the browser. If you started Firefox
-  yourself, quit that Firefox and relaunch it with the debugging port.
-- `firefox_restart` stops the Firefox the plugin launched, matched by profile,
-  so your normal browser keeps running. With `defaultProfile: true` there is
-  no profile to match, so it falls back to killing every Firefox process
+- Firefox allows one BiDi session at a time, and it doesn't release the session
+  when a client disconnects. If OpenCode is killed hard, the next connection
+  fails with `Maximum number of active sessions`. `firefox_restart` clears it
+  when the plugin launched the browser. If you started Firefox yourself, quit it
+  and relaunch with the debugging port.
+- `firefox_restart` stops the Firefox the plugin launched, matched by profile, so
+  your normal browser keeps running. With `defaultProfile: true` there's no
+  profile to match, so it falls back to killing every Firefox process
   (`pkill -x firefox` / `taskkill /IM firefox.exe /F`). Unsaved tabs in that
-  instance are lost — use it only to recover.
-- The plugin has no network interception, download handling, or multi-browser
-  abstraction. It is a small, intentionally direct Firefox driver.
-- Firefox stopped shipping CDP, so Chrome DevTools-based tooling cannot attach
-  to the debugging port.
+  instance are lost, so use it only to recover.
+- There's no network interception, download handling, or multi-browser
+  abstraction. It's a small Firefox driver and not much else.
+- Firefox stopped shipping CDP, so Chrome DevTools-based tooling can't attach to
+  the debugging port.
 
 ## How it works
 
 Firefox exposes WebDriver BiDi at `ws://127.0.0.1:9222/session`. The plugin opens
-one WebSocket, creates a session, and sends commands such as
+one WebSocket, creates a session, and sends commands like
 `browsingContext.navigate`, `script.evaluate`, `input.performActions`, and
-`browsingContext.captureScreenshot`. Page helpers (snapshot, click, fill) are
-JavaScript evaluated in the page, which is why there is nothing else to install.
+`browsingContext.captureScreenshot`. Snapshot, click, and fill are JavaScript
+evaluated in the page, which is why there's nothing else to install.
 
 ## Development
 
@@ -280,12 +271,14 @@ pnpm install
 pnpm check   # typecheck + tests
 ```
 
-To try a local checkout in OpenCode, point `plugins` at the repository
-directory (see [Install](#install)) or link it with `npm link`.
+To try a local checkout in OpenCode, point `plugins` at the repository directory
+(see [Install](#install)) or link it with `npm link`.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
+
+This plugin is not affiliated with the OpenCode project.
 
 Firefox is a trademark of Mozilla.org in the US and other countries. This
 project is not affiliated with, endorsed by, or sponsored by Mozilla.

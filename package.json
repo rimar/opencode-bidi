@@ -1,6 +1,6 @@
 {
   "name": "opencode-bidi",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Firefox browser automation for OpenCode, over WebDriver BiDi. Attach to your real session or launch an isolated profile. No extension, no browser tooling.",
   "type": "module",
   "license": "MIT",
